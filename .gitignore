@@ -27,6 +27,7 @@ wandb/
 
 # jupyter
 .ipynb_checkpoints/
+notebooks/*.ipynb
 
 # slurm
 slurm-*.out

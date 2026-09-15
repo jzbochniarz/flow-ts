@@ -1,7 +1,7 @@
 [project]
 name = "flow-ts"
 version = "0.1.0"
-description = "Add your description here"
+description = "FlowTS: domain-agnostic latent flow matching for time series."
 readme = "README.md"
 authors = [
     { name = "Jan Bochniarz", email = "janek.bochniarz@gmail.com" }
@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "matplotlib>=3.11.2",
     "numpy>=2.4.6",
-    "pyaml>=26.7.0",
+    "omegaconf>=2.3.1",
     "torch>=2.14.0",
     "torchvision>=0.29.0",
     "tqdm>=4.70.1",
@@ -25,6 +25,20 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "ipykernel>=7.3.0",
+    "jupyter>=1.1.1",
     "pytest>=9.1.1",
     "ruff>=0.16.7",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

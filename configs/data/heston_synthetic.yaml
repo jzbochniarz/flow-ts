@@ -1,0 +1,28 @@
+n_assets: 10
+
+asset_param_ranges:      # sampled per-asset, uniform within range
+  S0:    [50.0, 150.0]
+  v0:    [0.02, 0.06]
+  kappa: [1.0, 3.0]
+  theta: [0.02, 0.06]
+  xi:    [0.2, 0.4]
+
+asset_sampling_seed: 7   
+
+market:
+  r: 0.02
+
+correlation:
+  rho_price_price: 0.3
+  rho_vol_vol: 0.2
+  rho_leverage: -0.7
+  rho_cross_price_vol: 0.0
+
+simulation:
+  T: 1.0
+  N_steps: 255 # 256 including t=0, 4 windows of 64 steps each
+
+splits:
+  train: {N_paths: 8000, seed: 42}
+  val:   {N_paths: 1000, seed: 43}
+  test:  {N_paths: 1000, seed: 44}
