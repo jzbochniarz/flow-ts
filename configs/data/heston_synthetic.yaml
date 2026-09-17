@@ -20,7 +20,7 @@ correlation:
 
 simulation:
   T: 1.0
-  N_steps: 255 # 256 including t=0, 4 windows of 64 steps each
+  N_steps: 256 # 257 including t=0, but 256 after log-returns
 
 splits:
   train: {N_paths: 8000, seed: 42}
