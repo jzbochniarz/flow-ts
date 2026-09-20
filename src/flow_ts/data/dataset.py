@@ -46,6 +46,7 @@ class TimeSeriesDataset(Dataset):
             self.mean, self.std = None, None
             self.raw = raw
 
+        self.raw = torch.from_numpy(self.raw).float()
         self.windows_per_path = (self.t - self.window_len) // self.stride + 1
         self.total_windows = self.n_paths * self.windows_per_path
 
@@ -60,7 +61,8 @@ class TimeSeriesDataset(Dataset):
             mean = torch.as_tensor(mean, device=x.device, dtype=x.dtype)
             std = torch.as_tensor(std, device=x.device, dtype=x.dtype)
             return x * std + mean
-        return x * std + mean
+        else:  # np.ndarray
+            return x * std + mean
 
     def __len__(self) -> int:
         return self.total_windows
@@ -70,5 +72,4 @@ class TimeSeriesDataset(Dataset):
         window_idx = idx % self.windows_per_path
         start = window_idx * self.stride
         end = start + self.window_len
-        chunk = self.raw[path_idx, start:end]  # (window_len, C)
-        return torch.from_numpy(chunk).float()
+        return self.raw[path_idx, start:end]  # (window_len, C)

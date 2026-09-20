@@ -26,6 +26,8 @@ class VAE(nn.Module, ABC):
             std = torch.exp(0.5 * logvar)
             eps = torch.randn_like(std)
             return mu + std * eps
+        else:  # evaluation mode, return the mean
+            return mu
 
     def forward(self, x: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor]:
         """Forward pass through the whole VAE.
