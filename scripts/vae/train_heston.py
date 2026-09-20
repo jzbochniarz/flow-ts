@@ -67,7 +67,13 @@ def run_one_epoch(
             if is_train:
                 optimizer.zero_grad(set_to_none=True)
 
-            recon_x, mu, logvar, _ = model(x)
+            if is_train:
+                recon_x, mu, logvar, _ = model(x)
+            else:
+                mu, logvar = model.encode(x)
+                z = model.reparameterize(mu, logvar)
+                recon_x = model.decode(z)
+                
             loss, recon_loss, kl_loss = compute_loss(recon_x, x, mu, logvar, beta)
 
             if not torch.isfinite(loss).item():
@@ -170,8 +176,8 @@ def main() -> None:
 
         print(
             f"\nEpoch {epoch + 1}/{cfg.training.epochs} | "
-            f"Train MSE {train_recon:.5f}, KL {train_kl:.5f} | "
-            f"Val MSE {val_recon:.5f}, KL {val_kl:.5f}",
+            f"Train MSE {train_recon:.3e}, KL {train_kl:.3e} | "
+            f"Val MSE {val_recon:.3e}, KL {val_kl:.3e}",
             flush=True,
         )
 

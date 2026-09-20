@@ -29,10 +29,12 @@ wandb/
 .ipynb_checkpoints/
 notebooks/*.ipynb
 
-# slurm
+# slurm and cluster work
 slurm/*.sh
 slurm-*.out
+logs/
 *.log
+runs/
 
 # os/editor noise
 .DS_Store

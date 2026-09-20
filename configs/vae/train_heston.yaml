@@ -1,6 +1,6 @@
 # configs/train_vae.yaml
 model:
-  latent_dim: 128
+  latent_dim: 80
   patch_len: 8
 
 training:
@@ -9,8 +9,8 @@ training:
   lr: 1e-3
   beta: 1e-3
   seed: 42
-  num_workers: 4
-  save_dir: "checkpoints/vae_heston"
+  num_workers: 2
+  save_dir: "runs/vae_heston"
 
 data:
   window_len: 64

@@ -22,12 +22,9 @@ class VAE(nn.Module, ABC):
 
     def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
         """Reparameterization trick: z = mu + std * eps"""
-        if self.training:
-            std = torch.exp(0.5 * logvar)
-            eps = torch.randn_like(std)
-            return mu + std * eps
-        else:  # evaluation mode, return the mean
-            return mu
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return mu + std * eps
 
     def forward(self, x: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor]:
         """Forward pass through the whole VAE.
@@ -39,6 +36,6 @@ class VAE(nn.Module, ABC):
             z: [B, N, D] - sampled latent variable
         """
         mu, logvar = self.encode(x)
-        z = self.reparameterize(mu, logvar)
+        z = self.reparameterize(mu, logvar) if self.training else mu
         recon_x = self.decode(z)
         return recon_x, mu, logvar, z
