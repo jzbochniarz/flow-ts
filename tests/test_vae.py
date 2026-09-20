@@ -7,10 +7,10 @@ from flow_ts.models.vae.patch_vae import PatchVAE
 @pytest.mark.parametrize("batch_size,window_len", [(1, 256), (4, 256), (2, 128)])
 def test_patch_vae(batch_size: int, window_len: int) -> None:
     input_dim = 10
-    d_model = 128
+    latent_dim = 128
     patch_len = 16
 
-    vae = PatchVAE(input_channels=input_dim, d_model=d_model, patch_len=patch_len)
+    vae = PatchVAE(input_dim=input_dim, latent_dim=latent_dim, patch_len=patch_len)
     x = torch.randn(batch_size, window_len, input_dim)
     n_patches = window_len // patch_len
     patch_dim = patch_len * input_dim
@@ -27,7 +27,7 @@ def test_patch_vae(batch_size: int, window_len: int) -> None:
     recon_x, mu, logvar, z = vae(x)
 
     assert recon_x.shape == x.shape
-    assert mu.shape == (batch_size, n_patches, d_model)
+    assert mu.shape == (batch_size, n_patches, latent_dim)
     assert logvar.shape == mu.shape
     assert z.shape == mu.shape
 

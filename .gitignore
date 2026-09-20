@@ -30,6 +30,7 @@ wandb/
 notebooks/*.ipynb
 
 # slurm
+slurm/*.sh
 slurm-*.out
 *.log
 

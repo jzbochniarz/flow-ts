@@ -1,12 +1,37 @@
+import argparse
 from pathlib import Path
 
 import torch
-from omegaconf import OmegaConf
-from torch import Tensor, nn
+from omegaconf import DictConfig, OmegaConf
+from torch import nn
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from flow_ts.data.dataset import TimeSeriesDataset
 from flow_ts.models import PatchVAE
+
+
+def parse_config_and_args() -> tuple[DictConfig, argparse.Namespace]:
+    parser = argparse.ArgumentParser(description="Train PatchVAE Encoder.")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="configs/vae/train_heston.yaml",
+        help="Path to the YAML config file.",
+    )
+    parser.add_argument(
+        "--smoke-test",
+        action="store_true",
+        help="Run 1 step on the first batch to verify the pipeline, then exit.",
+    )
+
+    # Add overrides from CLI
+    args, overrides = parser.parse_known_args()
+
+    file_cfg = OmegaConf.load(args.config)
+    cli_cfg = OmegaConf.from_cli(overrides)
+    cfg = OmegaConf.merge(file_cfg, cli_cfg)
+    return cfg, args
 
 
 def compute_loss(
@@ -21,59 +46,159 @@ def compute_loss(
     return recon_loss + beta * kl_loss, recon_loss, kl_loss
 
 
-def overfit_single_batch(
+def run_one_epoch(
     model: PatchVAE,
-    batch: Tensor,
-    optimizer: torch.optim.Optimizer,
-    beta: float,
-    save_dir: Path,
-) -> None:
+    loader: DataLoader,
+    optimizer: torch.optim.Optimizer | None = None,
+    beta: float = 1e-3,
+    device: torch.device = torch.device("cuda"),
+    smoke_test: bool = False,
+):
+    is_train = optimizer is not None
+    model.train(is_train)
 
-    for step in range(1000):
-        optimizer.zero_grad(set_to_none=True)
-        recon_x, mu, logvar, z = model(batch)
+    total_loss = total_recon = total_kl = 0.0
+    n_samples = 0
 
-        loss, recon_loss, kl_loss = compute_loss(recon_x, batch, mu, logvar, beta)
-        if not torch.isfinite(loss):
-            raise ValueError(f"Loss is {loss}, stopping training")
+    with torch.set_grad_enabled(is_train):
+        for batch in loader:
+            x = batch.to(device=device, dtype=torch.float32)
 
-        loss.backward()
-        optimizer.step()
+            if is_train:
+                optimizer.zero_grad(set_to_none=True)
 
-        if step % 100 == 0:
-            print(
-                f"{step}: mse={recon_loss.item():.5f}, "
-                f"kl={kl_loss.item():.5f}, total={loss.item():.5f}"
-            )
+            recon_x, mu, logvar, _ = model(x)
+            loss, recon_loss, kl_loss = compute_loss(recon_x, x, mu, logvar, beta)
 
+            if not torch.isfinite(loss).item():
+                raise RuntimeError("Non-finite VAE loss")
+
+            if is_train:
+                loss.backward()
+                optimizer.step()
+
+            batch_size = x.shape[0]
+            total_loss += loss.item() * batch_size
+            total_recon += recon_loss.item() * batch_size
+            total_kl += kl_loss.item() * batch_size
+            n_samples += batch_size
+
+            if smoke_test:
+                break
+
+    if n_samples == 0:
+        raise ValueError("Loader produced no batches")
+
+    return (
+        total_loss / n_samples,
+        total_recon / n_samples,
+        total_kl / n_samples,
+    )
+
+
+def main() -> None:
+    cfg, args = parse_config_and_args()
+    save_dir = Path(cfg.training.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
-    torch.save({"model_state_dict": model.state_dict()}, save_dir / "last_epoch.pt")
-
-
-def main(cfg_path: Path = Path("configs/train_vae.yaml")) -> None:
-    cfg = OmegaConf.load(cfg_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on: {device}.")
+
+    train_ds = TimeSeriesDataset(
+        npz_path=cfg.data.train_path,
+        window_len=cfg.data.window_len,
+        stride=cfg.data.stride,
+        normalize=cfg.data.normalize,
+    )
+    n_paths, T, input_dim = train_ds.raw.shape
+
+    val_ds = TimeSeriesDataset(
+        npz_path=cfg.data.val_path,
+        window_len=cfg.data.window_len,
+        stride=cfg.data.stride,
+        normalize=cfg.data.normalize,
+    )
+
+    torch.manual_seed(cfg.training.seed)
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=cfg.training.batch_size,
+        shuffle=True,
+        num_workers=cfg.training.num_workers,
+    )
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=cfg.training.batch_size,
+        shuffle=False,
+        num_workers=cfg.training.num_workers,
+    )
+
     model = PatchVAE(
-        input_channels=cfg.model.input_channels,
-        d_model=cfg.model.latent_dim,
+        input_dim=input_dim,
+        latent_dim=cfg.model.latent_dim,
         patch_len=cfg.model.patch_len,
     )
     model.to(device)
-    save_dir = Path(cfg.training.save_dir)
-    torch.manual_seed(cfg.training.seed)
-
-    train_dataset = TimeSeriesDataset(
-        npz_path=cfg.data.training.path,
-        window_len=cfg.data.training.window_len,
-        stride=cfg.data.training.stride,
-        normalize=cfg.data.training.normalize,
+    print(
+        f"Initialized PatchVAE:\n"
+        f"input_dim={input_dim}, latent_dim={cfg.model.latent_dim}, patch_len={cfg.model.patch_len}",
+        flush=True,
     )
-    train_loader = DataLoader(train_dataset, batch_size=cfg.training.batch_size, shuffle=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.training.lr)
 
-    batch = next(iter(train_loader))
-    overfit_single_batch(model, batch, optimizer, cfg.training.beta, save_dir)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.training.lr)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=cfg.training.epochs, eta_min=1e-6
+    )
+
+    best_val_loss = float("inf")
+    for epoch in tqdm(range(cfg.training.epochs)):
+        train_loss, train_recon, train_kl = run_one_epoch(
+            model=model,
+            loader=train_loader,
+            optimizer=optimizer,
+            beta=cfg.training.beta,
+            device=device,
+            smoke_test=args.smoke_test,
+        )
+        val_loss, val_recon, val_kl = run_one_epoch(
+            model=model,
+            loader=val_loader,
+            optimizer=None,
+            beta=cfg.training.beta,
+            device=device,
+            smoke_test=args.smoke_test,
+        )
+
+        print(
+            f"\nEpoch {epoch + 1}/{cfg.training.epochs} | "
+            f"Train MSE {train_recon:.5f}, KL {train_kl:.5f} | "
+            f"Val MSE {val_recon:.5f}, KL {val_kl:.5f}",
+            flush=True,
+        )
+
+        scheduler.step()
+
+        is_best = val_loss < best_val_loss
+        best_val_loss = min(best_val_loss, val_loss)
+
+        checkpoint = {
+            "epoch": epoch,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": scheduler.state_dict(),
+            "val_loss": val_loss,
+            "best_val_loss": best_val_loss,
+            "cfg": OmegaConf.to_container(cfg, resolve=True),
+            "input_dim": input_dim,  # this may differ by dataset, so best to save
+        }
+
+        if args.smoke_test:
+            torch.save(checkpoint, save_dir / "smoke.pt")
+            print("Smoke test complete; saved smoke.pt.", flush=True)
+            break
+
+        torch.save(checkpoint, save_dir / "last.pt")
+        if is_best:
+            torch.save(checkpoint, save_dir / "best.pt")
 
 
 if __name__ == "__main__":

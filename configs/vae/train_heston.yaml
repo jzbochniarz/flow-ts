@@ -1,0 +1,20 @@
+# configs/train_vae.yaml
+model:
+  latent_dim: 128
+  patch_len: 8
+
+training:
+  epochs: 100
+  batch_size: 64
+  lr: 1e-3
+  beta: 1e-3
+  seed: 42
+  num_workers: 4
+  save_dir: "checkpoints/vae_heston"
+
+data:
+  window_len: 64
+  stride: 64
+  normalize: true
+  train_path: "data/processed/heston_train.npz"
+  val_path: "data/processed/heston_val.npz"
