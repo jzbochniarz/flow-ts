@@ -10,11 +10,11 @@ class Backbone(nn.Module, ABC):
     def forward(self, h: Tensor, c: Tensor) -> Tensor:
         """
         Args:
-            h: Embedded patches (B, N, C, D).
+            h: Embedded patches [B, N, C, D].
             c: Combined flow-time and observation-status
-                embedding (B, N, C, D).
+                embedding [B, N, C, D].
 
         Returns:
-            Updated hidden features (B, N, C, D).
+            Updated hidden features [B, N, C, D].
         """
         ...

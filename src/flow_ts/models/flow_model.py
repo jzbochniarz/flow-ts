@@ -52,7 +52,7 @@ class FlowModel(nn.Module):
         if observed_mask is None:
             observed_mask = torch.zeros(B, N, C, dtype=torch.bool, device=x_t.device)
         elif observed_mask.shape != (B, N, C) or observed_mask.dtype != torch.bool:
-            raise ValueError("Expected a boolean mask with shape (B, N, C)")
+            raise ValueError("Expected a boolean mask with shape [B, N, C]")
 
         h = self.input_projection(patches)
         c = self._build_condition(t, observed_mask)
@@ -64,9 +64,9 @@ class FlowModel(nn.Module):
 
     @staticmethod
     def patchify(x: Tensor, patch_len: int) -> Tensor:
-        """(B, T, C) -> (B, N, C, P)."""
+        """[B, T, C] -> [B, N, C, P]."""
         if x.ndim != 3:
-            raise ValueError("Expected input shape (B, T, C)")
+            raise ValueError("Expected input shape [B, T, C]")
 
         B, T, C = x.shape
         if T % patch_len != 0:
@@ -77,22 +77,24 @@ class FlowModel(nn.Module):
 
     @staticmethod
     def unpatchify(x: Tensor) -> Tensor:
-        """(B, N, C, P) -> (B, T, C)."""
+        """[B, N, C, P] -> [B, T, C]."""
         if x.ndim != 4:
-            raise ValueError("Expected patch shape (B, N, C, P)")
+            raise ValueError("Expected patch shape [B, N, C, P]")
 
         B, N, C, P = x.shape
         return x.transpose(2, 3).reshape(B, N * P, C)
 
     def _build_condition(
         self,
-        t: Tensor,  # (B,)
-        observed_mask: Tensor,  # bool (B, N, C); True if observed
+        t: Tensor,  # [B]
+        observed_mask: Tensor,  # bool [B, N, C]; True if observed
     ) -> Tensor:
         token_times = torch.where(
-            observed_mask, torch.ones_like(t[:, None, None]), t[:, None, None]
-        )  # (B, N, C)
+            observed_mask, 
+            torch.tensor(1.0, dtype=t.dtype, device=t.device), 
+            t[:, None, None]
+        )  # [B, N, C]
 
         return self.time_embedder(token_times) + self.status_embedding(
             observed_mask.long()
-        )  # (B, N, C, D)
+        )  # [B, N, C, D]
