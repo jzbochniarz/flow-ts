@@ -1,6 +1,6 @@
 # FlowTS
 
-Domain-agnostic latent flow matching engine for multivariate time series generation, forecasting, and imputation. VAE tokenizer + OT-conditional flow matching in latent space, with pluggable denoising backbones (DiT, Mamba).
+Domain-agnostic latent flow matching engine for multivariate time series generation, forecasting, and imputation. Deterministic patchifier/tokenizer + OT-conditional flow matching, with pluggable denoising backbones (DiT, TSMixer).
 
 ## Setup
 

@@ -1,3 +1,3 @@
-from flow_ts.models.vae.patch_vae import PatchVAE
+from flow_ts.models.flow_model import FlowModel as FlowModel
 
-all = ["PatchVAE"]
+all = ["FlowModel"]
