@@ -1,3 +1,4 @@
-from flow_ts.models.flow_model import FlowModel as FlowModel
+from .flow_model import FlowModel as FlowModel
+from .backbone.dit import DiT as DiT
 
-all = ["FlowModel"]
+all = ["FlowModel", "DiT"]

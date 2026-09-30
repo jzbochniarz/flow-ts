@@ -1,7 +1,7 @@
 import torch
 from torch import Tensor, nn
 
-from flow_ts.models.backbone.base import Backbone
+from .backbone.base import Backbone
 
 
 class FlowModel(nn.Module):
